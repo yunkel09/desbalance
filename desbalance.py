@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split as tts
-# from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.pipeline import Pipeline
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.pipeline import Pipeline as pipe
 
 from imblearn.over_sampling import SMOTE
 
@@ -19,6 +19,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, RobustScaler
 from sklearn.metrics import classification_report
 import imblearn as im
+
 
 # _____________________________________________________________________________
 # apagadores                                                               ####
@@ -89,10 +90,20 @@ ct = ColumnTransformer(transformers=[
 ct.fit(X_train)
 ct.transform(X_train)
 
+
+
 # .............................................................................
 # definir estimadores                                                      ####
 
 logreg = LogisticRegression(random_state=22)
+
+stratified_kfold = StratifiedKFold(n_splits=3,
+                                   shuffle=True,
+                                   random_state=22)
+
+
+
+param_grid = {"rel__penalty": ["l1", "l2"]}
 
 # .............................................................................
 # instancias para balancear                                                ####
@@ -120,32 +131,40 @@ con_smt = im.pipeline.Pipeline([
     ('rel', logreg)
 ])
 
+normal = pipe([('preprocesador', ct),  ('rel', logreg)])
+
 sin_smt = im.pipeline.Pipeline([
     ('preprocesador', ct),
     ('rel', logreg)
 ])
 
+param_grid = {'rel__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000]}
+
+
+grid_search = GridSearchCV(estimator=con_smt,
+                           param_grid=param_grid,
+                           scoring='recall', 
+                           cv=stratified_kfold,
+                           n_jobs=-1)
 
 # _____________________________________________________________________________
 # fit                                                                      ####
 
-con_smt.fit(X_train, y_train)
-y_hat_balanceado = con_smt.predict(X_test)
-
-sin_smt.fit(X_train, y_train)
-y_hat_imbalanceado = sin_smt.predict(X_test)
+grid_search.fit(X_train, y_train)
 
 # _____________________________________________________________________________
 # métricas                                                                 ####
 
-print(classification_report(
-    y_test,
-    y_hat_balanceado, 
-    zero_division=1,
-    target_names=target_names))
 
-print(classification_report(
-    y_test,
-    y_hat_imbalanceado,
-    zero_division=1,
-    target_names=target_names))
+cv_score = grid_search.best_score_
+test_score = grid_search.score(X_test, y_test)
+print(f'Cross-validation score: {cv_score}\nTest score: {test_score}')
+
+
+
+y_pred = grid_search.predict(X_test)
+print(classification_report(y_test, 
+                            y_pred, 
+                            zero_division=1, 
+                            target_names=target_names))
+
