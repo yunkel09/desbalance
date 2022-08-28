@@ -15,6 +15,11 @@ limpiar <- function(x) {
 
 con <- conectar_msql()
 
+afectacion_01 <- afectacion_00 |>
+	group_by(ticketid) |>
+	summarise(servicios = n()) |>
+	arrange(desc(servicios))
+
 
 ttks_00 <- tbl(con, in_schema("tkd", "w_ttks")) |>
 	collect()
@@ -52,77 +57,39 @@ materiales_01 <- descargas_00 |>
 
 ttks_01 <- ttks_00 |>
 	filter(
-		estado        == "CERRADO",
-		aplica        == "SI",
-		documentacion == "SI",
-		tipo_mtto     == "CORRECTIVO"
-		) |>
-	mutate(
-		lugar = case_when(
-			topografia == "EN_CLIENTE"  ~ "INTERIOR",
-			TRUE ~ "EXTERIOR"),
-		lugar = fct_reorder(lugar, ttr, .desc = F)) |>
-	select(ticketid, ttr, zona, lugar, nivel1, nivel2, nivel3, bu) |>
+		estado == "CERRADO",
+		aplica == "SI") |>
+	select(ticketid, topografia, ttr, zona, nivel2) |>
 	drop_na()
 
 
-ext <- ttks_01 |>
-	filter(
-		# nivel1 == "FIBRA_OPTICA",
-		lugar == "EXTERIOR")
-		# ttr > quantile(ttr, 0.15))
+ttks_02 <- ttks_01 |>
+	mutate(
+		interior = case_when(
+			topografia == "EN_CLIENTE"  ~ 1L,
+			TRUE ~ 0L)) |>
+	select(-topografia)
 
 
-ttks_01 |>
-	filter(
-		lugar == "INTERIOR") |> count(nivel3) |> print(n = Inf)
-
-int <- ttks_01 |>
-	filter(
-		lugar == "INTERIOR",
-		# ttr < quantile(ttr, 0.065),
-		# nivel3 %in% c("CORTE_PATCHCORD", "EQUIPO_APAGADO_CLIENTE")
-)
-
-place_00 <- bind_rows(ext, int)
-
-
-afectacion_01 <- afectacion_00 |>
-	group_by(ticketid) |>
-	summarise(servicios = n()) |>
-	arrange(desc(servicios))
-
-
-
-place_01 <- place_00 |>
+ttks_03 <- ttks_02 |>
 	inner_join(afectacion_01, by = "ticketid") |>
-	inner_join(materiales_01, by = "ticketid") |>
-	# mutate(across(detalle, limpiar)) |>
-	select(lugar, ttr, servicios, materiales, monto, zona, bu)
+	select(interior, ttr, zona, servicios, categoria = nivel2)
 
+int_s <- ttks_03 |>
+	filter(interior == 1) |>
+	slice_sample(n = 88)
 
-place_01 |> tabyl(lugar)
+ext_s <- ttks_03 |>
+	filter(interior == 0)
 
-int_s <- place_01 |>
-	filter(lugar == "INTERIOR") |>
-	slice_sample(n = 40)
+ttks_04 <- bind_rows(int_s, ext_s)
 
-ext_s <- place_01 |>
-	filter(lugar == "EXTERIOR")
+ttks_04 |> tabyl(interior)
 
-place_02 <- bind_rows(int_s, ext_s)
+ttks_05 <- ttks_04 |>
+	select(interior, ttr)
 
-
-place_02 |> tabyl(lugar)
-
-# agregar un poco de ruido
-place_01$lugar[sample(nrow(place_01), 40)] <- "INTERIOR"
-
-
-place_01 |> tabyl(lugar)
-
-
-write_csv(x = place_02, file = "place.csv")
+write_csv(x = ttks_04, file = "interior.csv")
 
 
 
