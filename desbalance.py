@@ -1,4 +1,6 @@
 
+# _____________________________________________________________________________
+# módulos                                                                  ####
 
 import pandas as pd
 import numpy as np
@@ -32,23 +34,16 @@ df
 # _____________________________________________________________________________
 # preparación                                                              ####
 
-# convertir respuesta a variable indicadora (1: interior, 0: exterior)
-#df_clean = (pd.get_dummies(df,
-#                           columns=['lugar'],
-#                           drop_first=True).
-#            rename(columns={'lugar_INTERIOR': 'interior'}))
-
-#df_clean['interior'] = df_clean['interior']
-
-# obtener lista de features por tipo de variable (num o cat)
-
+# obtener lista de features categóricos
 cat_var = ['zona', 'categoria']
 df[cat_var] = (df[cat_var].
                apply(lambda x: pd.Series(x).
                astype('category')))
-df.info()
+
+# lista features numéricos
 num_var = df.select_dtypes(exclude='category').columns.tolist()
 num_var.remove('interior')
+df.info()
 
 # _____________________________________________________________________________
 # exploración                                                              ####
@@ -77,18 +72,18 @@ X_train
 y_train
 
 # _____________________________________________________________________________
-# recetas                                                                  ####
+# columns transformer                                                      ####
 
-numeric_transformer = Pipeline(steps=[
+num_tr = Pipeline(steps=[
     ('scale', RobustScaler())])
 
-#categorical_transformer = Pipeline(steps=[
-#    ('one-hot', OneHotEncoder(handle_unknown='infrequent_if_exist',
-#                              sparse=False))])
+cat_tr = Pipeline(steps=[
+    ('one-hot', OneHotEncoder(handle_unknown='infrequent_if_exist',
+                              sparse=False))])
 
 ct = ColumnTransformer(transformers=[
-    ('num', numeric_transformer, num_var)
-    # ('cat', categorical_transformer, cat_var)
+    ('num', num_tr, num_var),
+    ('cat', cat_tr, cat_var)
 ])
 
 ct.fit(X_train)
@@ -108,7 +103,8 @@ smt = SMOTE(random_state=22)
 # evidenciar proceso de balanceo                                           ####
 
 # balancear
-x_trainb, y_trainb = smt.fit_resample(X_train, y_train)
+x_trainb, y_trainb = smt.fit_resample(X_train.drop('categoria', axis=1),
+                                      y_train)
 df_balanceado = pd.DataFrame(y_trainb, columns=['interior'])
 
 # gráfico de barra
@@ -118,19 +114,38 @@ plt.show()
 # .............................................................................
 # pipeline imbalanced-learn                                                ####
 
-clf = im.pipeline.Pipeline([
+con_smt = im.pipeline.Pipeline([
     ('preprocesador', ct),
     ('smt', smt),
     ('rel', logreg)
 ])
 
+sin_smt = im.pipeline.Pipeline([
+    ('preprocesador', ct),
+    ('rel', logreg)
+])
+
+
 # _____________________________________________________________________________
 # fit                                                                      ####
 
-clf.fit(X_train, y_train)
-y_hat = clf.predict(X_test)
+con_smt.fit(X_train, y_train)
+y_hat_balanceado = con_smt.predict(X_test)
+
+sin_smt.fit(X_train, y_train)
+y_hat_imbalanceado = sin_smt.predict(X_test)
 
 # _____________________________________________________________________________
 # métricas                                                                 ####
 
-print(classification_report(y_test, y_hat, target_names=target_names))
+print(classification_report(
+    y_test,
+    y_hat_balanceado, 
+    zero_division=1,
+    target_names=target_names))
+
+print(classification_report(
+    y_test,
+    y_hat_imbalanceado,
+    zero_division=1,
+    target_names=target_names))
