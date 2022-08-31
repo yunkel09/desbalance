@@ -73,8 +73,8 @@
 
 	exterior <- ttks_01 |>
 		filter(
-			interior == 0,
-			ttr > quantile(ttr, 0.15)
+			interior == 0
+			# ttr > quantile(ttr, 0.15)
 		)
 
 	interior <- ttks_01 |>
@@ -88,7 +88,17 @@
 
 	ttks_04 <- ttks_03 |>
 		inner_join(afectacion_01, by = "ticketid") |>
-		inner_join(materiales_01, by = "ticketid")
+		inner_join(materiales_01, by = "ticketid") |>
+		select(-ticketid) |>
+		rename(categoria = nivel3) |>
+		relocate(interior, ttr, servicios, materiales, monto, zona, bu, categoria)
+
+
+##  ............................................................................
+##  evaluar proporción                                                      ####
+
+	ttks_04 |> tabyl(interior)
+
 
 ##  ............................................................................
 ##  guardar                                                                 ####
