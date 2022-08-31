@@ -1,95 +1,101 @@
 
-import::from(magrittr, "%$%", ex = extract, .into = "operadores")
-import::from(zeallot, `%<-%`)
-pacman::p_load(DBI, dbplyr, conectigo, janitor, tidyverse)
 
-limpiar <- function(x) {
-
-	str_sub(x, 1, 24) |>
-		str_trim(side = "both") |>
-		str_remove_all(pattern = "[[:punct:]]+") |>
-		str_squish()
-
-}
-
-con <- conectar_msql()
+#   ____________________________________________________________________________
+#   proyecto: evaluar impacto del desbalance de clases                      ####
 
 
-afectacion_00 <- tbl(con, in_schema("tkd", "w_afectacion")) |>
-	collect()
+##  ............................................................................
+##  paquetes                                                                ####
 
-afectacion_01 <- afectacion_00 |>
-	group_by(ticketid) |>
-	summarise(servicios = n()) |>
-	arrange(desc(servicios))
-
-
-ttks_00 <- tbl(con, in_schema("tkd", "w_ttks")) |>
-	collect()
-
-descargas_00 <- tbl(con, in_schema("md", "descarga_vista")) |>
-	filter(estado_descarga_item %in% c("aplicado", "pendiente")) |>
-	select(fecha = fecha_uso,
-								cantidad,
-								contratista,
-								ticketid = ticket,
-								precio = usd,
-								item = nombre_informal) |>
-	collect()
-
-materiales_01 <- descargas_00 |>
-	filter(contratista != "Masscardy") |>
-	select(ticketid,
-								item,
-								precio,
-								cantidad) |>
-	mutate(across(precio, na_if, "NULL"),
-								across(precio, parse_number),
-								total = precio * cantidad) |>
-	relocate(precio, cantidad) |>
-	group_by(ticketid) |>
-	summarise(materiales = sum(cantidad),
-											monto = sum(total),
-											.groups = "drop") |>
-	arrange(desc(monto)) |>
-	drop_na()
+	import::from(magrittr, "%$%", ex = extract, .into = "operadores")
+	import::from(zeallot, `%<-%`)
+	pacman::p_load(DBI, dbplyr, conectigo, janitor, tidyverse)
 
 
-ttks_01 <- ttks_00 |>
-	filter(
-		estado == "CERRADO",
-		aplica == "SI") |>
-	select(ticketid, topografia, ttr, zona, nivel2) |>
-	drop_na()
+##  ............................................................................
+##  cargar                                                                  ####
+
+	con <- conectar_msql()
+
+	afectacion_00 <- tbl(con, in_schema("tkd", "w_afectacion")) |>
+		collect()
+
+	afectacion_01 <- afectacion_00 |>
+		group_by(ticketid) |>
+		summarise(servicios = n()) |>
+		arrange(desc(servicios))
+
+	ttks_00 <- tbl(con, in_schema("tkd", "w_ttks")) |>
+		collect()
+
+	descargas_00 <- tbl(con, in_schema("md", "descarga_vista")) |>
+		filter(estado_descarga_item %in% c("aplicado", "pendiente")) |>
+		select(fecha = fecha_uso,
+									cantidad,
+									contratista,
+									ticketid = ticket,
+									precio = usd,
+									item = nombre_informal) |>
+		collect()
+
+	materiales_01 <- descargas_00 |>
+		filter(contratista != "Masscardy") |>
+		select(ticketid,
+									item,
+									precio,
+									cantidad) |>
+		mutate(across(precio, na_if, "NULL"),
+									across(precio, parse_number),
+									total = precio * cantidad) |>
+		relocate(precio, cantidad) |>
+		group_by(ticketid) |>
+		summarise(materiales = sum(cantidad),
+												monto = sum(total),
+												.groups = "drop") |>
+		arrange(desc(monto)) |>
+		drop_na()
 
 
-ttks_02 <- ttks_01 |>
-	mutate(
-		interior = case_when(
-			topografia == "EN_CLIENTE"  ~ 1L,
-			TRUE ~ 0L)) |>
-	select(-topografia)
+##  ............................................................................
+##  prep                                                                    ####
 
+	ttks_01 <- ttks_00 |>
+		filter(
+			estado == "CERRADO",
+			aplica == "SI",
+			documentacion == "SI") |>
+		mutate(
+			interior = case_when(
+				topografia == "EN_CLIENTE"  ~ 1L,
+				TRUE ~ 0L)) |>
+		select(ticketid, ttr, zona, nivel3, bu, interior) |>
+		drop_na()
 
-ttks_03 <- ttks_02 |>
-	inner_join(afectacion_01, by = "ticketid") |>
-	select(interior, ttr, zona, servicios, categoria = nivel2)
+	exterior <- ttks_01 |>
+		filter(
+			interior == 0,
+			ttr > quantile(ttr, 0.15)
+		)
 
-int_s <- ttks_03 |>
-	filter(interior == 1) |>
-	slice_sample(n = 88)
+	interior <- ttks_01 |>
+		filter(
+			interior == 1,
+			ttr < quantile(ttr, 0.065),
+			nivel3 %in% c("CORTE_PATCHCORD", "EQUIPO_APAGADO_CLIENTE")
+		)
 
-ext_s <- ttks_03 |>
-	filter(interior == 0)
+	ttks_03 <- bind_rows(interior, exterior)
 
-ttks_04 <- bind_rows(int_s, ext_s)
+	ttks_04 <- ttks_03 |>
+		inner_join(afectacion_01, by = "ticketid") |>
+		inner_join(materiales_01, by = "ticketid")
 
-ttks_04 |> tabyl(interior)
+##  ............................................................................
+##  guardar                                                                 ####
 
-ttks_05 <- ttks_04 |>
-	select(interior, ttr)
+	write_csv(x = ttks_04, file = "interior.csv")
 
-write_csv(x = ttks_04, file = "interior.csv")
-
+#   ____________________________________________________________________________
+#   fin_script                                                              ####
 
 
