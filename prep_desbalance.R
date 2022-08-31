@@ -12,8 +12,11 @@ limpiar <- function(x) {
 
 }
 
-
 con <- conectar_msql()
+
+
+afectacion_00 <- tbl(con, in_schema("tkd", "w_afectacion")) |>
+	collect()
 
 afectacion_01 <- afectacion_00 |>
 	group_by(ticketid) |>
@@ -22,9 +25,6 @@ afectacion_01 <- afectacion_00 |>
 
 
 ttks_00 <- tbl(con, in_schema("tkd", "w_ttks")) |>
-	collect()
-
-afectacion_00 <- tbl(con, in_schema("tkd", "w_afectacion")) |>
 	collect()
 
 descargas_00 <- tbl(con, in_schema("md", "descarga_vista")) |>

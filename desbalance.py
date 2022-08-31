@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split as tts
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, RepeatedStratifiedKFold
 from sklearn.pipeline import Pipeline as pipe
 
 from imblearn.over_sampling import SMOTE
@@ -65,12 +65,28 @@ y = df.interior
 # aplicar estratificación
 X_train, X_test, y_train, y_test = tts(X,
                                        y,
-                                       test_size=0.2,
+                                       train_size=0.85,
                                        stratify=y,
                                        random_state=22)
 
-X_train
-y_train
+
+
+
+# crear set de validación
+X_train2, X_val, y_train2, y_val = tts(X_train,
+                                       y_train,
+                                       train_size=0.828969415701948,
+                                       random_state=22)
+
+
+print(round(len(X_train) / len(df), 2))
+print(round(len(X_val) / len(df), 2))
+print(round(len(X_test) / len(df), 2))
+
+
+X_train2
+y_train2
+
 
 # _____________________________________________________________________________
 # columns transformer                                                      ####
@@ -90,18 +106,14 @@ ct = ColumnTransformer(transformers=[
 ct.fit(X_train)
 ct.transform(X_train)
 
-
-
 # .............................................................................
 # definir estimadores                                                      ####
 
-logreg = LogisticRegression(random_state=22)
+logreg = LogisticRegression(random_state=22, max_iter=1000)
 
 stratified_kfold = StratifiedKFold(n_splits=3,
                                    shuffle=True,
                                    random_state=22)
-
-
 
 param_grid = {"rel__penalty": ["l1", "l2"]}
 
@@ -140,10 +152,10 @@ sin_smt = im.pipeline.Pipeline([
 
 param_grid = {'rel__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000]}
 
-
 grid_search = GridSearchCV(estimator=con_smt,
                            param_grid=param_grid,
-                           scoring='recall', 
+                           scoring='recall',
+                           error_score='raise',
                            cv=stratified_kfold,
                            n_jobs=-1)
 
@@ -155,16 +167,14 @@ grid_search.fit(X_train, y_train)
 # _____________________________________________________________________________
 # métricas                                                                 ####
 
-
 cv_score = grid_search.best_score_
 test_score = grid_search.score(X_test, y_test)
 print(f'Cross-validation score: {cv_score}\nTest score: {test_score}')
 
 
-
 y_pred = grid_search.predict(X_test)
-print(classification_report(y_test, 
-                            y_pred, 
-                            zero_division=1, 
+print(classification_report(y_test,
+                            y_pred,
+                            zero_division=1,
                             target_names=target_names))
 
