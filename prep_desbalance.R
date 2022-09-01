@@ -89,9 +89,8 @@
 	ttks_04 <- ttks_03 |>
 		inner_join(afectacion_01, by = "ticketid") |>
 		inner_join(materiales_01, by = "ticketid") |>
-		select(-ticketid) |>
-		rename(categoria = nivel3) |>
-		relocate(interior, ttr, servicios, materiales, monto, zona, bu, categoria)
+		select(-c(ticketid, nivel3)) |>
+		relocate(interior, ttr, servicios, materiales, monto, zona, bu)
 
 
 ##  ............................................................................

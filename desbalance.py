@@ -3,23 +3,19 @@
 # módulos                                                                  ####
 
 import pandas as pd
-# import numpy as np
 import seaborn as sns
+import imblearn as im
 import matplotlib.pyplot as plt
-# from sklearn.ensemble import RandomForestClassifier
+
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split as tts
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RepeatedStratifiedKFold as rskf
-# from sklearn.pipeline import Pipeline as pipe
-
 from imblearn.over_sampling import SMOTE
-
 from imblearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, RobustScaler
 from sklearn.metrics import classification_report
-import imblearn as im
 
 # _____________________________________________________________________________
 # carga                                                                    ####
@@ -31,7 +27,7 @@ df
 # preparación                                                              ####
 
 # categóricos
-cat_var = ['zona', 'bu', 'categoria']
+cat_var = ['zona', 'bu']
 df[cat_var] = (df[cat_var].
                apply(lambda x: pd.Series(x).
                astype('category')))
@@ -57,7 +53,7 @@ plt.show()
 X = df.drop('interior', axis=1)
 y = df.interior
 
-# train(85%), validación (15%), test (15%)
+# train(70%), validación (15%), test (15%)
 
 # aplicar estratificación
 X_train, X_test, y_train, y_test = tts(X,
@@ -66,7 +62,7 @@ X_train, X_test, y_train, y_test = tts(X,
                                        stratify=y,
                                        random_state=22)
 
-# crear set de validación
+# crear set de validación a partir de set de entrenamiento
 X_train, X_val, y_train, y_val = tts(X_train,
                                      y_train,
                                      train_size=0.828969415701948,
@@ -182,7 +178,6 @@ print(classification_report(y_val,
 y_pred = grid_search.predict(X_test)
 print(classification_report(y_test,
                             y_pred, 
-                            output_dict=True,
                             zero_division=1))
 
 # _____________________________________________________________________________
