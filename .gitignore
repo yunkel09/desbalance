@@ -54,12 +54,12 @@ office365
 *.rdx
 *.rds
 *.RData
-*.png
+
 *.jpg
 *.pptx
 *.html
 *.txt
-*.svg
+
 *.css
 *.pdf
 *.csl
@@ -76,7 +76,7 @@ office365
 *.eot
 *.svg
 *.emf
-*.PNG
+
 *.lof
 *.lot
 *.toc
