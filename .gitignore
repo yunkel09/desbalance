@@ -55,7 +55,7 @@ office365
 *.rds
 *.RData
 
-*.jpg
+
 *.pptx
 *.html
 *.txt
@@ -74,7 +74,7 @@ office365
 *.woff2
 *.ttf
 *.eot
-*.svg
+
 *.emf
 
 *.lof
