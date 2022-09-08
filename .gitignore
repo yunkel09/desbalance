@@ -35,6 +35,8 @@ vignettes/*.pdf
 *.utf8.md
 *.knit.md
 
+*.R
+*.Rmd
 
 office365
 
@@ -48,7 +50,6 @@ office365
 *.lnk
 *.xlsx
 *.fst
-*.csv
 *.rdb
 *.rdx
 *.rds
@@ -79,7 +80,6 @@ office365
 *.lof
 *.lot
 *.toc
-*.md
 *.aux
 *.out
 

@@ -7,8 +7,8 @@
 
 import pandas as pd
 import seaborn as sns
-# import imblearn as im
 import matplotlib.pyplot as plt
+import time
 
 # .............................................................................
 # sklearn                                                                  ####
@@ -35,7 +35,7 @@ from scipy.stats import loguniform
 # .............................................................................
 # tuberías                                                                 ####
 
-from sklearn.pipeline import make_pipeline, Pipeline
+from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer, make_column_selector
 from imblearn.pipeline import Pipeline as imbPipeline
 
@@ -43,8 +43,13 @@ from imblearn.pipeline import Pipeline as imbPipeline
 # muestreo                                                                 ####
 
 from imblearn.over_sampling import SMOTE
-from imblearn.combine import SMOTEENN, SMOTETomek
+from imblearn.combine import SMOTETomek
 from imblearn.under_sampling import RandomUnderSampler
+
+# _____________________________________________________________________________
+# opciones                                                                 ####
+
+sns.set_palette("Set1")
 
 # _____________________________________________________________________________
 # carga                                                                    ####
@@ -53,13 +58,28 @@ df = pd.read_csv('interior.csv')
 df
 
 # _____________________________________________________________________________
+# preparación                                                              ####
+
+# categóricos
+cat_var = ['zona', 'bu']
+df[cat_var] = (df[cat_var].
+               apply(lambda x: pd.Series(x).
+               astype('category')))
+
+# numéricos
+num_var = df.select_dtypes(exclude='category').columns.tolist()
+num_var.remove('interior')
+df.info()
+
+# _____________________________________________________________________________
 # exploración                                                              ####
 
 # relación 1:100
 df.interior.value_counts(normalize=True)
 
 # gráfico de barra: desbalance
-sns.countplot(y='interior', data=df, palette="Set2")
+fig, ax = plt.subplots(figsize=(10, 10))
+sns.countplot(y='interior', data=df).set(title='Desbalance de clases')
 plt.show()
 
 # _____________________________________________________________________________
@@ -90,16 +110,19 @@ print(f'trai: {tr}\nvali: {va}\ntest: {te}')
 # _____________________________________________________________________________
 # estimadores                                                              ####
 
-# Linear model (logistic regression)
-lr = LogisticRegression(warm_start=True, solver='lbfgs', penalty='l2')
+# logistic regression
+lr = LogisticRegression(warm_start=True,
+                        solver='lbfgs',
+                        penalty='l2', 
+                        max_iter=1000)
 
-# RandomForest
+# random forest
 rf = RandomForestClassifier()
 
-# XGB
+# xgb
 xgb = XGBClassifier(tree_method="hist", verbosity=0, silent=True)
 
-# Ensemble
+# ensemble
 lr_xgb_rf = VotingClassifier(estimators=[('lr', lr),
                                          ('xgb', xgb),
                                          ('rf', rf)],
@@ -115,7 +138,7 @@ sin_muestreo = imbPipeline([
         # paso 1.1: features numéricos
         ('num', make_pipeline(
              StandardScaler()),
-         make_column_selector(dtype_include='float64')
+         make_column_selector(dtype_include='number')
         ),
         # paso 1.2 features categóricos
         ('cat', make_pipeline(
@@ -135,7 +158,7 @@ standar_smote = imbPipeline([
         # paso 1.1: features numéricos
         ('num', make_pipeline(
              RobustScaler()),
-         make_column_selector(dtype_include='float64')
+         make_column_selector(dtype_include='number')
         ),
         # paso 1.2 features categóricos
         ('cat',make_pipeline(
@@ -150,36 +173,14 @@ standar_smote = imbPipeline([
     ('ensemble', lr_xgb_rf)
 ])
 
-# receta 3: SMOTE and Edited Nearest Neighbours (https://bit.ly/3x2ED7E)
-nearest_neighbours = imbPipeline([
-    # paso 1: aplicar transformaciones
-    ('prep', ColumnTransformer([
-        # paso 1.1: features numéricos
-        ('num', make_pipeline(
-            StandardScaler()),
-         make_column_selector(dtype_include='float64')
-        ),
-        # paso 1.2 features categóricos
-        ('cat',make_pipeline(
-            OneHotEncoder(sparse=False, 
-                          handle_unknown='infrequent_if_exist')),
-         make_column_selector(dtype_include='category')
-        )])
-    ),
-    # paso 3: muestreo
-    ('smote', SMOTEENN(random_state=22)),
-    # paso 4: consolidar estimador (ensemble)
-    ('ensemble', lr_xgb_rf)
-])
-
-# receta 4: RandomUnderSampler
+# receta 3: RandomUnderSampler
 under_sampler = imbPipeline([
     # paso 1: aplicar transformaciones
     ('prep', ColumnTransformer([
         # paso 1.1: features numéricos
         ('num', make_pipeline(
             StandardScaler()),
-         make_column_selector(dtype_include='float64')
+         make_column_selector(dtype_include='number')
         ),
         # paso 1.2 features categóricos
         ('cat',make_pipeline(
@@ -194,14 +195,14 @@ under_sampler = imbPipeline([
     ('ensemble', lr_xgb_rf)
 ])
 
-# receta 5: sobre-muestreo con SMOTETomek
+# receta 4: sobre-muestreo con SMOTETomek
 smote_tomek = imbPipeline([
     # paso 1: aplicar transformaciones
     ('prep', ColumnTransformer([
         # paso 1.1: features numéricos
         ('num', make_pipeline(
             StandardScaler()),
-         make_column_selector(dtype_include='float64')
+         make_column_selector(dtype_include='number')
         ),
         # paso 1.2 features categóricos
         ('cat',make_pipeline(
@@ -219,15 +220,13 @@ smote_tomek = imbPipeline([
 
 tuberias = [sin_muestreo,
             standar_smote,
-            nearest_neighbours,
             under_sampler,
             smote_tomek]
 
 pipe_dict = {0: 'sin_balanceo',
              1: 'smote_simple',
-             2: 'smoteenn',
-             3: 'sub_muestreo',
-             4: 'smotetomek'}
+             2: 'sub_muestreo',
+             3: 'smotetomek'}
 
 # _____________________________________________________________________________
 # cuadrícula de hiperparámetros                                            ####
@@ -253,8 +252,8 @@ params = {
 # _____________________________________________________________________________
 # validación cruzada                                                       ####
 
-rsf = RepeatedStratifiedKFold(n_splits=3,
-                              n_repeats=2,
+rsf = RepeatedStratifiedKFold(n_splits=10,
+                              n_repeats=5,
                               random_state=22)
 
 cdx = []
@@ -270,9 +269,13 @@ for pipe in tuberias:
 # _____________________________________________________________________________
 # fit                                                                      ####
 
-# training time: 177 seg con 12 nucleos físicos en paralelo
+# training time:
+# 10 folds & 10 reps: 145 seg (2.41 min) con 12 nucleos físicos en paralelo
+start = time.time()
 for pipe in cdx:
     pipe.fit(X_train, y_train)
+stop = time.time()
+print(f"Training time: {stop - start}s")
 
 # _____________________________________________________________________________
 # métricas                                                                 ####
@@ -308,25 +311,43 @@ for idx, val in enumerate(cdx):
 
 
 # .............................................................................
-# cv_score y validación                                                    ####
+# métricas                                                   ####
 
 dfx = pd.DataFrame(dxl, columns=['modelo',
-                                 'cv-score',     # recall
+                                 'cv_score',     # recall
                                  'recall',
                                  'precision',
-                                 'f1-score'])
+                                 'f1_score'])
+dfx['i'] = dfx.index
+
+# cv_score y validación
 dfx
 
 # .............................................................................
 # seleccionar mejor modelo                                                 ####
 
-# smote-simple
-cdx[1]
+dfp = pd.melt(dfx, id_vars=['modelo'], value_vars=['recall', 'precision'])
+
+# gráfica de barras
+(sns.barplot(x='value',
+             y='modelo',
+             hue='variable',
+             data=dfp,
+             palette=color).
+ set(title='Precision y Recall por Modelo'))
+plt.show()
+
+# seleccionar el mejor modelo con base a f1-score
+mejor_modelo = (dfx[dfx.f1_score == dfx.f1_score.max()].
+                head(1).i.item())
+
+# revisar cual es el mejor modelo
+pipe_dict[mejor_modelo]
 
 # .............................................................................
 # prueba                                                                   ####
 
-prediccion = cdx[1].predict(X_test)
+prediccion = cdx[mejor_modelo].predict(X_test)
 print(classification_report(y_test,
                             prediccion,
                             zero_division=1,
