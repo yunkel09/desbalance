@@ -20,8 +20,10 @@
 > Se requiere identificar si una falla de fibra óptica ocurrió en la
 > planta interna (1) o en la planta externa (0)
 
+## Datos
+
 Se cuenta con un dataset con 4,661 observaciones, seis features y la
-variable respuesta: interior.
+variable respuesta: interior. Los datos se encuentran en el csv adjunto.
 
 ## Data Dictionary
 
@@ -39,6 +41,8 @@ variable respuesta: interior.
 
 Los datos tienen un desbalance de $\frac{1}{125}$. De 4,621 ejemplos,
 solo 40 observaciones pertenecen a la clase “interior”.
+
+![](figures/desbalance.png)
 
 ### Framework
 
@@ -68,11 +72,21 @@ creó una cuadrícula con hiperparámetros para cada caso.
 ### Conclusión
 
 Se realizó cross-validación con 10 folds y 5 repeticiones para cada
-fold, obteniendo los siguientes resultados:
+fold, obteniendo los siguientes resultados con entrenamiento y
+validación.
+
+![](figures/barras.png)
+
+-   cv-score: resultados de datos de entrenamiento.
+-   recall, precisión y f1: para datos de validación
 
 ![](figures/metricas.png) </br>
 
 El mejor modelo fue *SMOTE* con una precisión y recall del 100%.
+
+A continuación los resultados con los **datos de prueba:**
+
+![](figures/metricas_prueba.png)
 
 <span style="background-color: #FFFF00">**El muestreo sintético para
 balancear la clase relevante entrega, al menos en este ejercicio,
