@@ -65,7 +65,7 @@ Se utilizó un esquema de ensemble para consolidar la mejor estimación de
 tres modelos posibles: XGBoost, Regresión Logística y Random Forest. Se
 creó una cuadrícula con hiperparámetros para cada caso.
 
-### Conclusiones
+### Conclusión
 
 Se realizó cross-validación con 10 folds y 5 repeticiones para cada
 fold, obteniendo los siguientes resultados:
@@ -73,3 +73,7 @@ fold, obteniendo los siguientes resultados:
 ![](figures/metricas.png) </br>
 
 El mejor modelo fue *SMOTE* con una precisión y recall del 100%.
+
+<span style="background-color: #FFFF00">**El muestreo sintético para
+balancear la clase relevante entrega, al menos en este ejercicio,
+mejores métricas en comparación si se deja todo sin balancear.**</span>
